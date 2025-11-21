@@ -1,6 +1,7 @@
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
+import { zapierRouter } from "./routers/zapier";
 import { publicProcedure, router, protectedProcedure } from "./_core/trpc";
 import { z } from "zod";
 import { 
@@ -15,9 +16,11 @@ import {
   getUserStats
 } from "./db";
 import { TRPCError } from "@trpc/server";
+import { generatePortal, generateAllPortals, getPortalStatus, getPortalsByType } from "./services/portalGenerator";
 
 export const appRouter = router({
   system: systemRouter,
+  zapier: zapierRouter,
 
   portals: router({
     // Generate a single portal (admin only)
@@ -39,17 +42,22 @@ export const appRouter = router({
         console.log(`[Portal Generator] Generating ${portalType} portal: ${portalName}`);
         console.log(`[Portal Generator] Requested by: ${ctx.user.email}`);
 
-        const portalId = `${portalType}-${Date.now()}`;
-        const deploymentUrl = `https://${portalName.toLowerCase().replace(/\s+/g, "-")}.manus.space`;
+        // Use real portal generation service
+        const result = await generatePortal(portalName, {
+          skipDeploy: false,
+        });
 
         return {
-          success: true,
-          portalId,
+          success: result.success,
+          portalId: result.portalId,
           portalName,
           portalType,
-          deploymentUrl,
-          status: "generating",
-          message: `Portal generation initiated for ${portalName}`,
+          deploymentUrl: result.deploymentUrl,
+          status: result.success ? "completed" : "failed",
+          message: result.success 
+            ? `Portal generation completed for ${portalName}`
+            : `Portal generation failed: ${result.error}`,
+          logs: result.logs,
           timestamp: new Date().toISOString(),
         };
       }),
@@ -67,6 +75,14 @@ export const appRouter = router({
 
         console.log(`[Portal Generator] Generating all 51 portals`);
         console.log(`[Portal Generator] Requested by: ${ctx.user.email}`);
+
+        // Use real portal generation service (async, don't wait)
+        generateAllPortals({ skipDeploy: false }).then(results => {
+          const successCount = results.filter(r => r.success).length;
+          console.log(`[Portal Generator] Completed: ${successCount}/${results.length} portals`);
+        }).catch(error => {
+          console.error(`[Portal Generator] Error:`, error);
+        });
 
         return {
           success: true,
