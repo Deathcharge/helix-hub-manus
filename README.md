@@ -142,7 +142,7 @@ This is a living system. Contributions welcome!
 
 ## 📄 License
 
-MIT License - See LICENSE file for details
+Proprietary License - See LICENSE file for details
 
 ---
 
